@@ -1,0 +1,4 @@
+name = "AStat"
+uuid = "be65b9db-614c-4dbc-83f5-dfa5475207be"
+authors = ["BuildTools <unconfigured@null.spigotmc.org>"]
+version = "0.1.0"

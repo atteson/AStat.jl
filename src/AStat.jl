@@ -25,20 +25,29 @@ end
 function lis( x::AbstractVector{T} ) where {T}
     n = length(x)
     indices = fill( 0, n )
-    parents = fill( 0, n )
+    parent = fill( 0, n )
     l = 0
     for i = 1:n
         r = binary_search( indices, x, x[i], l )
         if r > l
             l = r
             indices[r] = i
-            
         elseif x[i] < x[indices[r]]
             indices[r] = i
         end
+        if r > 1
+            parent[i] = indices[r-1]
+        end
     end
 
-    return indices[1:l]
+    lis = fill( 0, l )
+    i = l
+    lis[i] = indices[l]
+    while parent[lis[i]] != 0
+        lis[i-1] = parent[lis[i]]
+        i -= 1
+    end
+    return lis
 end
 
 function binary_search( indices, a, x, n )
