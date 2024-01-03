@@ -1,6 +1,9 @@
 module AStat
 
-export ols, lis
+using StatsBase
+using DataStructures
+
+export ols, lis, median_filter
 
 function ols( X, y )
     n = length(y)
@@ -65,6 +68,15 @@ function binary_search( indices, a, x, n )
         end
     end
     return lo
+end
+
+function median_filter( x::Vector{T}, n::Int ) where {T}
+    N = length(x)
+    result = Array{T}( undef, N - n + 1 );
+    for i = 1:N-n+1
+        result[i] = median( x[i:i+n-1] )
+    end
+    return result
 end
 
 end # module AStat
