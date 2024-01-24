@@ -2,8 +2,9 @@ module AStat
 
 using StatsBase
 using DataStructures
+using LinearAlgebra
 
-export ols, lis, median_filter
+export ols, lis, median_filter, randf, Spearman, freqmap
 
 function ols( X, y )
     n = length(y)
@@ -77,6 +78,31 @@ function median_filter( x::Vector{T}, n::Int ) where {T}
         result[i] = median( x[i:i+n-1] )
     end
     return result
+end
+
+function randf( f, x, y, n )
+    maxf = -Inf
+    for i = 1:n
+        sy = shuffle(y)
+        c = f( x, sy )
+        if c > maxf
+            maxf = c
+        end
+    end
+    return maxf
+end
+
+Spearman(x, y) = cor(invperm(sortperm(x)), invperm(sortperm(y)))
+
+function freqmap( a::AbstractVector{T} ) where {T}
+    d = Dict{T,Int}()
+    for x in a
+        d[x] = get( d, x, 0 ) + 1
+    end
+    ks = collect(keys(d))
+    vs = collect(values(d))
+    sp = sortperm(vs, order=Base.Order.Reverse)
+    return OrderedDict( zip( ks[sp], vs[sp]./sum(vs) ) )
 end
 
 end # module AStat
