@@ -3,13 +3,15 @@ export IndependentRandomVariable, Constant, open_interval
 
 using Distributions
 using Random
+import Random: gentype
 using MissingTypes
 
-# subtype of Real so that they can be used as parameters of Distributions
-abstract type RandomVariable <: Real
+abstract type RandomVariable{T}
 end
 
-mutable struct Constant{T} <: RandomVariable
+gentype( ::RandomVariable{T} ) where T = T
+
+mutable struct Constant{T} <: RandomVariable{T}
     lo::T
     left::Bool
     hi::T
@@ -18,8 +20,8 @@ mutable struct Constant{T} <: RandomVariable
     visited::Bool
 end
 
-mutable struct IndependentRandomVariable{T <: Distribution, U <: Random.gentype(Random.gentype(T))} <: RandomVariable
-    distribution::T
+mutable struct IndependentRandomVariable{T <: Distribution, U} <: RandomVariable{U}
+    parameters::Vector{RandomVariable}
     value::Vector{MissingType{U}}
     visited::Bool
 end
@@ -33,16 +35,10 @@ function open_interval( x, y )
     return Constant{T}( x, false, y, false, [MissingTypes.missing_value(T)], false )
 end
 
-function IndependentRandomVariable( distribution::Distribution )
-    T = Random.gentype(Random.gentype(distribution))
-    return IndependentRandomVariable( distribution, MissingType{T}[MissingTypes.missing_value(T)], false )
+function IndependentRandomVariable( ::Type{T}, parameters::RandomVariable... ) where {T <: Distribution}
+    U = promote_type( gentype.( parameters )... )
+    return IndependentRandomVariable{T,U}( [parameters...], MissingType{U}[MissingTypes.missing_value(U)], false )
 end
-
-Random.gentype( c::Constant{T} ) where T = T
-Random.gentype( ::Type{Constant{T}} ) where T = T
-Random.gentype( X::IndependentRandomVariable{T} ) where T = promote_type(Random.gentype.( params( X.distribution ) )...)
-
-Base.:<( x::Constant{T}, y::Constant{T} ) where T = x.hi < y.lo || ( x.hi == y.lo && !( x.right && y.left ) )
 
 function Base.setindex!( x::Constant{T}, y::U ) where {T, U <: Number}
     @assert( ( y < x.hi || ( y == x.hi && x.right ) ) && ( y > x.lo || ( y == x.lo && x.left ) ) )
@@ -51,32 +47,21 @@ function Base.setindex!( x::Constant{T}, y::U ) where {T, U <: Number}
 end
 
 function clear!( x::Constant{T} ) where T
-    x.visited = false
 end
 
 function clear!( x::IndependentRandomVariable{T} ) where T
     if x.visited
         x.visited = false
-        for param in params(distribution)
-            clear!( param )
+        for parameter in x.parameters
+            clear!( parameter )
         end
     end
 end
 
-function generate_distribution( rng::AbstractRNG, distribution::U ) where {U <: Distribution}
-    generated_params = Random.gentype(Random.gentype(distribution))[]
-    for param in params(distribution)
-        if !param.visited
-            param.visited = true
-            rand!(rng, param.value, Random.SamplerTrivial(param), clear=false )
-        end
-        push!( generated_params, param.value[1] )
-    end
-    return Base.typename(U).wrapper(generated_params...)
-end
-
-function Random.rand!(rng::AbstractRNG, A::AbstractArray{T}, sp::Random.SamplerTrivial{V}; clear::Bool = true ) where {T,V}
+function Random.rand!(rng::AbstractRNG, A::AbstractArray{U}, sp::Random.SamplerTrivial{Constant{T}};
+                      clear::Bool = true ) where {T, U <: Union{T,MissingType{T}}}
     @assert( !ismissing( sp.self.value[1] ) )
+    sp.self.visited = true
     A .= sp.self.value[1]
     if clear
         clear!( sp.self )
@@ -84,25 +69,21 @@ function Random.rand!(rng::AbstractRNG, A::AbstractArray{T}, sp::Random.SamplerT
     return A
 end
 
-function Random.rand!(rng::AbstractRNG, A::AbstractArray{T}, sp::Random.SamplerTrivial{V};
-                      clear::Bool = true ) where{T, U, V <: IndependentRandomVariable{U}}
+function Random.rand!(rng::AbstractRNG, A::AbstractArray{V}, sp::Random.SamplerTrivial{IndependentRandomVariable{T,U}};
+                      clear::Bool = true ) where{T, U, V <: Union{U,MissingType{U}}}
     for index in eachindex(A)
-        A[index] = rand( rng, generate_distribution( rng, sp.self.distribution ) )
-    end
-    if clear
-        clear!( sp.self )
-    end
-    return A
-end
-
-struct IIDRandomProcess{T <: Distribution}
-    distribution::T
-end
-
-function Random.rand!(rng::AbstractRNG, A::AbstractArray{T}, sp::Random.SamplerTrivial{IIDRandomProcess{U}} ) where {T, U}
-    (n, s) = Iterators.peel(size(A))
-    for i in CartesianIndices(([1:x for x in s]...,))
-        A[:,i] = rand!( rng, generate_distribution( rng, sp.self.distribution ), n )
+        sp.self.visited = true
+        generated_parameters = U[]
+        for parameter in sp.self.parameters
+            if !parameter.visited
+                rand!( rng, parameter.value, Random.SamplerTrivial(parameter), clear=false )
+            end
+            push!( generated_parameters, parameter.value[1] )
+        end
+        A[index] = rand( rng, T(generated_parameters...) )
+        if clear
+            clear!( sp.self )
+        end
     end
     return A
 end
