@@ -22,4 +22,6 @@ rand( X, 20, 10 )
 
 Z = IndependentRandomVariable( Normal, X, σ₀ )
 @time std( rand( Z, 1_000_000 ) )
-@enter( rand( Z, 10 )
+
+Y = IIDRandomProcess( Normal, X, σ₀ )
+@time mean( rand( Y, 1_000_000 ) )
