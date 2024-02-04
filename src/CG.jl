@@ -20,8 +20,8 @@ mutable struct Constant{T} <: RandomElement{T}
     visited::Bool
 end
 
-mutable struct IndependentRandomVariable{T <: Distribution, U} <: RandomElement{U}
-    parameters::Vector{RandomElement}
+mutable struct IndependentRandomVariable{T <: Distribution, U, V <: Tuple{Vararg{RandomElement}}} <: RandomElement{U}
+    parameters::V
     value::Vector{MissingType{U}}
     visited::Bool
 end
@@ -36,8 +36,8 @@ function open_interval( x, y )
 end
 
 function IndependentRandomVariable( ::Type{T}, parameters::RandomElement... ) where {T <: Distribution}
-    U = promote_type( gentype.( parameters )... )
-    return IndependentRandomVariable{T,U}( [parameters...], MissingType{U}[MissingTypes.missing_value(U)], false )
+    V = promote_type( gentype.( parameters )... )
+    return IndependentRandomVariable{T,V,typeof(parameters)}( parameters, MissingType{V}[MissingTypes.missing_value(V)], false )
 end
 
 function Base.setindex!( x::Constant{T}, y::U ) where {T, U <: Number}
@@ -60,8 +60,8 @@ function Random.rand!(rng::AbstractRNG, A::AbstractArray{U}, sp::Random.SamplerT
     return A
 end
 
-function Random.rand!(rng::AbstractRNG, A::AbstractArray{V}, sp::Random.SamplerTrivial{IndependentRandomVariable{T,U}};
-                      clear::Bool = true ) where{T, U, V <: Union{U,MissingType{U}}}
+function Random.rand!(rng::AbstractRNG, A::AbstractArray{V}, sp::Random.SamplerTrivial{IndependentRandomVariable{T,U,W}};
+                      clear::Bool = true ) where{T, U, V <: Union{U,MissingType{U}}, W}
     for index in eachindex(A)
         sp.self.visited = true
         generated_parameters = U[]
