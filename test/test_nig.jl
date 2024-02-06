@@ -1,6 +1,7 @@
 using QuadGK
 using SpecialFunctions
 using Distributions
+using Random
 
 normpdf( x, u, t ) = (sqrt(t)/sqrt(2*pi))^length(x) * exp(-t/2 * sum((x .- u).^2))
 
@@ -42,8 +43,14 @@ function f( x, t, a, b, u0, t0 )
     n = length(x)
     xbar = mean(x)
     x2bar = mean(x.^2)
-    factor = b^a/gamma(a) * sqrt(t0)/(sqrt(t0 + n) * (2*pi)^(n/2)) * t^(n/2 + a - 1)
-    return factor * exp(-t * (b + 1/2*(t0 * u0^2 + n * x2bar - (t0 * u0 + n * xbar)^2/(t0 + n))))
+    factor = b^a/gamma(a) * sqrt(t0)/(sqrt(t0 + n) * (2 * pi)^(n/2)) * t^(n/2 + a - 1)
+    return factor * exp(-t * (b + 1/2 * (t0 * u0^2 + n * x2bar - (t0 * u0 + n * xbar)^2/(t0 + n))))
+end
+
+function f( x, a, b, u0, t0 )
+    n = length(x)
+    factor = b^a/gamma(a) * sqrt(t0)/(sqrt(t0 + n) * (2 * pi)^(n/2))
+    return factor * gamma(n/2 + a)/( b + 1/2 * (t0 * u0^2 + sum(x.^2) - (t0 * u0 + sum(x))^2/(t0 + n)))^(n/2 + a) 
 end
 
 x = collect(1.0:3.0)
@@ -61,6 +68,17 @@ quadgk( u -> f2( x, t, u, a, b, u0, t0 ), -Inf, Inf )
 quadgk( u -> f3( x, t, u, a, b, u0, t0 ), -Inf, Inf )
 quadgk( u -> f4( x, t, u, a, b, u0, t0 ), -Inf, Inf )
 
-dt = 0.0001
-sum((u -> f( x, t, u, a, b, u0, t0 )).(-20:dt:20))*dt
-sum((u -> f1( x, t, u, a, b, u0, t0 )).(-20:dt:20))*dt
+quadgk( t -> f( x, t, a, b, u0, t0 ), 0, Inf )
+
+f( x, a, b, u0, t0 )
+
+Random.srand!(1)
+x = randn( 10 )
+a = 1/rand()
+b = 1/rand()
+u0 = randn()
+t0 = rand()
+
+f( x, a, b, u0, t0 )
+
+quadgk( t -> f( x, t, a, b, u0, t0 ), 0, Inf )
