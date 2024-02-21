@@ -2,6 +2,8 @@ using QuadGK
 using SpecialFunctions
 using Distributions
 using Random
+using ReverseDiff
+using LinearAlgebra
 
 normpdf( x, u, t ) = (sqrt(t)/sqrt(2*pi))^length(x) * exp(-t/2 * sum((x .- u).^2))
 
@@ -82,3 +84,33 @@ t0 = rand()
 f( x, a, b, u0, t0 )
 
 quadgk( t -> f( x, t, a, b, u0, t0 ), 0, Inf )
+
+quadgk( x -> f( x, a, b, u0, t0 ), -Inf, Inf )
+
+inputs = [a, b, u0, t0]
+tape = ReverseDiff.GradientTape( v -> f( x, v[1], v[2], v[3], v[4] ), inputs )
+compiled = ReverseDiff.compile( tape )
+results = similar(inputs)
+ReverseDiff.gradient!( results, compiled, inputs)
+
+fidi = [(f( x, (inputs .+ 1e-6 * I(4)[i,:])... ) - f( x, (inputs .- 1e-6 * I(4)[i,:])... ))/2e-6 for i in 1:4]
+@assert( all(abs.(fidi ./ results .- 1) .< 1e-6) )
+
+n = Normal( u0, 1/sqrt(t0) )
+@assert( all(abs.(pdf( n, -2:0.5:2 ) - normpdf.( -2:0.5:2, u0, t0 )) .< 1e-8) )
+
+N = 1_000
+Random.seed!(1)
+t = rand( Gamma( a, b ), N );
+u = rand.( Normal.( u0, 1 ./ sqrt.(t0 .* t) ) );
+x = rand.( Normal.( u, 1 ./ sqrt.(t) ), 20 );
+
+inputs = [1.0, 1., 0.0, 1.0]
+tape = ReverseDiff.GradientTape( v -> sum(log.(f.( x, v[1], v[2], v[3], v[4] ))), inputs )
+compiled = ReverseDiff.compile( tape )
+results = similar(inputs)
+@time ReverseDiff.gradient!( results, compiled, inputs);
+
+fidi = [(sum(log.(f.( x, (inputs .+ 1e-6 * I(4)[i,:])... ))) - sum(log.(f.( x, (inputs .- 1e-6 * I(4)[i,:])... ))))/2e-6 for i in 1:4]
+@assert( all(abs.(fidi ./ results .- 1) .< 1e-6) )
+
