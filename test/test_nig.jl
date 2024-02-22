@@ -100,11 +100,11 @@ fidi = [(f( x, (inputs .+ 1e-6 * I(4)[i,:])... ) - f( x, (inputs .- 1e-6 * I(4)[
 n = Normal( u0, 1/sqrt(t0) )
 @assert( all(abs.(pdf( n, -2:0.5:2 ) - normpdf.( -2:0.5:2, u0, t0 )) .< 1e-8) )
 
-N = 1_000
+N = 20_000
 Random.seed!(1)
 t = rand( Gamma( a, b ), N );
 u = rand.( Normal.( u0, 1 ./ sqrt.(t0 .* t) ) );
-x = rand.( Normal.( u, 1 ./ sqrt.(t) ), 20 );
+x = rand.( Normal.( u, 1 ./ sqrt.(t) ), 50 );
 
 function g( x, a0, b0, u0, t0 )
     n = length(x)
@@ -128,11 +128,13 @@ build_g( x ) = v -> -sum(log.(g.( x, v[1], v[2], v[3], v[4] )))
 
 build_g( x )( inputs )
 
-build_grad_g( x, tape ) = (grad, v) -> ReverseDiff.gradient!( grad, tape, v )
+build_grad_g( tape ) = (grad, v) -> ReverseDiff.gradient!( grad, tape, v )
 
-@assert( all( abs.(build_grad_g( x, compiled )(results, inputs) ./ fidi .- 1) .< 1e-7 ) )
+@assert( all( abs.(build_grad_g( compiled )(results, inputs) ./ fidi .- 1) .< 1e-7 ) )
 
 @time solution = optimize( build_g( x ), build_grad_g( x, compiled ), inputs, ConjugateGradient() )
 v = Optim.minimizer( solution )
-[exp(v[1]) exp(v[2]) v[3] exp(v[4]); a b u0 t0]
+[exp(v[1]) exp(v[2]) v[3] exp(v[4])]./[a b u0 t0] .- 1
 
+build_g( x )( v )
+build_g( x )( [log(a), log(b), u0, log(t0)] )
