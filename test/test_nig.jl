@@ -4,6 +4,7 @@ using Distributions
 using Random
 using ReverseDiff
 using LinearAlgebra
+using Optim
 
 normpdf( x, u, t ) = (sqrt(t)/sqrt(2*pi))^length(x) * exp(-t/2 * sum((x .- u).^2))
 
@@ -74,7 +75,7 @@ quadgk( t -> f( x, t, a, b, u0, t0 ), 0, Inf )
 
 f( x, a, b, u0, t0 )
 
-Random.srand!(1)
+Random.seed!(1)
 x = randn( 10 )
 a = 1/rand()
 b = 1/rand()
@@ -105,12 +106,33 @@ t = rand( Gamma( a, b ), N );
 u = rand.( Normal.( u0, 1 ./ sqrt.(t0 .* t) ) );
 x = rand.( Normal.( u, 1 ./ sqrt.(t) ), 20 );
 
-inputs = [1.0, 1., 0.0, 1.0]
-tape = ReverseDiff.GradientTape( v -> sum(log.(f.( x, v[1], v[2], v[3], v[4] ))), inputs )
+function g( x, a0, b0, u0, t0 )
+    n = length(x)
+    a = exp(a0)
+    b = exp(b0)
+    t = exp(t0)
+    factor = b^a/gamma(a) * sqrt(t)/(sqrt(t + n) * (2 * pi)^(n/2))
+    return factor * gamma(n/2 + a)/( b + 1/2 * (t * u0^2 + sum(x.^2) - (t * u0 + sum(x))^2/(t + n)))^(n/2 + a) 
+end
+
+inputs = zeros(4)
+tape = ReverseDiff.GradientTape( v -> -sum(log.(g.( x, v[1], v[2], v[3], v[4] ))), inputs )
 compiled = ReverseDiff.compile( tape )
 results = similar(inputs)
 @time ReverseDiff.gradient!( results, compiled, inputs);
 
-fidi = [(sum(log.(f.( x, (inputs .+ 1e-6 * I(4)[i,:])... ))) - sum(log.(f.( x, (inputs .- 1e-6 * I(4)[i,:])... ))))/2e-6 for i in 1:4]
+fidi = [(-sum(log.(g.( x, (inputs .+ 1e-6 * I(4)[i,:])... ))) - -sum(log.(g.( x, (inputs .- 1e-6 * I(4)[i,:])... ))))/2e-6 for i in 1:4]
 @assert( all(abs.(fidi ./ results .- 1) .< 1e-6) )
+
+build_g( x ) = v -> -sum(log.(g.( x, v[1], v[2], v[3], v[4] )))
+
+build_g( x )( inputs )
+
+build_grad_g( x, tape ) = (grad, v) -> ReverseDiff.gradient!( grad, tape, v )
+
+@assert( all( abs.(build_grad_g( x, compiled )(results, inputs) ./ fidi .- 1) .< 1e-7 ) )
+
+@time solution = optimize( build_g( x ), build_grad_g( x, compiled ), inputs, ConjugateGradient() )
+v = Optim.minimizer( solution )
+[exp(v[1]) exp(v[2]) v[3] exp(v[4]); a b u0 t0]
 
