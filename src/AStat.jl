@@ -5,6 +5,7 @@ include("CG.jl")
 using StatsBase
 using DataStructures
 using LinearAlgebra
+using Distributions
 
 export ols, lis, median_filter, randf, Spearman, freqmap, momentmap, label, bound, multimomentmap
 
@@ -16,6 +17,9 @@ function ols( X, y )
     res = y - yhat
     var = res'*res/n
     yvar = y'*y/n
+    p2 = length(beta)
+    ftest = (yvar - var)/(p2*var/(n-p2))
+    pvalue = cdf( FDist(p2, n-p2), ftest )
     return Dict(
         :beta => beta,
         :var => var,
@@ -25,6 +29,8 @@ function ols( X, y )
         :R2 => 1 - var/yvar,
         :yhat => yhat,
         :res => res,
+        :Ftest => ftest,
+        :pvalue => pvalue,
     )
 end
 
