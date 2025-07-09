@@ -6,33 +6,64 @@ using StatsBase
 using DataStructures
 using LinearAlgebra
 using Distributions
+using StaticArrays
 
-export ols, lis, median_filter, randf, Spearman, freqmap, momentmap, label, bound, multimomentmap
+import StatsBase: mean, std, var
 
-function ols( X, y )
+export OLSModel, FTest, pvalue
+export lis, median_filter, randf, Spearman, freqmap, momentmap, label, bound, multimomentmap
+
+struct OLSModel{T <: Number, M <: AbstractMatrix{T},V <: AbstractVector{T}}
+    X::M
+    y::V
+    beta::Vector{T}
+    rss::T
+    std::T
+    covbeta::Matrix{T}
+    R2::T
+    yhat::Vector{T}
+    res::Vector{T}
+end
+
+function OLSModel( X::M, y::V ) where {T <: Number, M <: AbstractMatrix{T}, V <: AbstractVector{T}}
     n = length(y)
     inv = pinv(X'*X)
     beta = inv*X'*y
     yhat = X*beta
     res = y - yhat
-    var = res'*res/n
-    yvar = y'*y/n
-    p2 = length(beta)
-    ftest = (yvar - var)/(p2*var/(n-p2))
-    pvalue = cdf( FDist(p2, n-p2), ftest )
-    return Dict(
-        :beta => beta,
-        :var => var,
-        :yvar => yvar,
-        :std => sqrt(var),
-        :covbeta => var * inv,
-        :R2 => 1 - var/yvar,
-        :yhat => yhat,
-        :res => res,
-        :Ftest => ftest,
-        :pvalue => pvalue,
+    rss_model = res'*res
+    rss = y'*y
+    var = rss_model/n
+    return OLSModel(
+        X, y, beta, rss_model, sqrt(var), var * inv, 1 - rss_model/rss, yhat, res,
     )
 end
+
+X(model::OLSModel) = model.X
+y(model::OLSModel) = model.y
+parameters( model::OLSModel ) = model.beta
+RSS( model::OLSModel ) = model.rss
+
+struct FTest
+    test::Float64
+    pvalue::Float64
+end
+
+function FTest( models::OLSModel{T,M,V}... ) where {T,M,V}
+    @assert( length(models) == 2 )
+    @assert( y(models[1]) == y(models[2]) )
+    @assert( all( in.( eachcol(X(models[1])), [eachcol(X(models[2]))] ) ) )
+    (p1, p2) = length.(parameters.(models))
+    (RSS1, RSS2) = RSS.( models )
+
+    df1 = p2 - p1
+    df2 = length(y( models[1] )) - p2
+    
+    ftest = (RSS1 - RSS2)/df2/(RSS2/df1)
+    return FTest( ftest, ccdf( FDist(df1, df2), ftest ) )
+end
+
+pvalue( ftest::FTest ) = ftest.pvalue
 
 function lis( x::AbstractVector{T} ) where {T}
     n = length(x)
