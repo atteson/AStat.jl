@@ -6,7 +6,6 @@ using StatsBase
 using DataStructures
 using LinearAlgebra
 using Distributions
-using StaticArrays
 
 import StatsBase: mean, std, var
 
@@ -59,7 +58,7 @@ function FTest( models::OLSModel{T,M,V}... ) where {T,M,V}
     df1 = p2 - p1
     df2 = length(y( models[1] )) - p2
     
-    ftest = (RSS1 - RSS2)/df2/(RSS2/df1)
+    ftest = (RSS1 - RSS2)/df1/(RSS2/df2)
     return FTest( ftest, ccdf( FDist(df1, df2), ftest ) )
 end
 
