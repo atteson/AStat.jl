@@ -116,7 +116,7 @@ label( x::AbstractVector{T}, bounds::Vector{T} ) where {T} =
 label( x::AbstractVector{T}, buckets::Int ) where {T} = label( x, bound( x, buckets ) )
 
 function momentmap( x::AbstractVector{T}, y::AbstractVector{U}, buckets::Int; moments = 1  ) where {T,U}
-    (x,y) = makegood(x,y)
+#    (x,y) = makegood(x,y)
     n = length(x)
 
     bounds = bound( x, buckets )
@@ -142,7 +142,7 @@ function momentmap( x::AbstractVector{T}, y::AbstractVector{U}, buckets::Int; mo
 end
 
 function multimomentmap( x::AbstractVector{T}, y::AbstractVector{U}, z::AbstractVector{V}, xbuckets::Int, zbuckets::Int; moments::Int = 1 ) where {T,U,V}
-    (x,y,z) = makegood(x,y,z)
+#    (x,y,z) = makegood(x,y,z)
     n = length(x)
 
     zbounds = bound( z, zbuckets )
