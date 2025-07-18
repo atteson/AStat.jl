@@ -9,7 +9,7 @@ using Distributions
 
 import StatsBase: mean, std, var
 
-export OLSModel, FTest, pvalue
+export OLSModel, FTest, pvalue, R²
 export lis, median_filter, randf, Spearman, freqmap, momentmap, label, bound, multimomentmap
 
 struct OLSModel{T <: Number, M <: AbstractMatrix{T},V <: AbstractVector{T}}
@@ -19,7 +19,7 @@ struct OLSModel{T <: Number, M <: AbstractMatrix{T},V <: AbstractVector{T}}
     rss::T
     std::T
     covbeta::Matrix{T}
-    R2::T
+    R²::T
     yhat::Vector{T}
     res::Vector{T}
 end
@@ -38,10 +38,13 @@ function OLSModel( X::M, y::V ) where {T <: Number, M <: AbstractMatrix{T}, V <:
     )
 end
 
+OLSModel( x::V, y::V ) where {T <: Number, V <: AbstractVector{T}} = OLSModel( reshape( x, (length(x),1) ), y )
+
 X(model::OLSModel) = model.X
 y(model::OLSModel) = model.y
 parameters( model::OLSModel ) = model.beta
 RSS( model::OLSModel ) = model.rss
+R²( model::OLSModel ) = model.R²
 
 struct FTest
     test::Float64
